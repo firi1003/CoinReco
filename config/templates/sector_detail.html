@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}{{ sector.name }} 섹터 코인 | CoinReco{% endblock %}
+{% block header_title %}{{ sector.name }} Explorer{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Sector Info & Stats -->
+    <div class="col-12">
+        <div class="card border-0 shadow-sm p-4 rounded-4" style="background: #fff;">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="h2 fw-bold mb-2">{{ sector.name }}</h1>
+                    <p class="text-muted mb-0 lead" style="font-size: 1rem;">{{ sector_description }}</p>
+                </div>
+                <div class="col-md-4 text-md-end mt-3 mt-md-0" id="avg-change-container">
+                    <div class="d-inline-block bg-light rounded-4 p-3 border" id="avg-change-loading">
+                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                        <span class="text-muted small fw-bold">데이터 로드 중...</span>
+                    </div>
+                    <div class="d-inline-block bg-light rounded-4 p-3 border d-none" id="avg-change-content">
+                        <span class="d-block text-muted small text-uppercase fw-bold mb-1">24H Avg Change</span>
+                        <span class="fs-3 fw-bold" id="avg-change-value">
+                            <!-- Value will be injected here -->
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Insights -->
+    <div class="col-12">
+        <div class="card border-0 shadow-sm overflow-hidden rounded-4" style="background: #fff;">
+            <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+                <h5 class="fw-bold mb-0 d-flex align-items-center">
+                    <div class="rounded-circle bg-primary bg-opacity-10 p-2 me-3 d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">
+                        <i class="bi bi-robot text-primary"></i>
+                    </div>
+                    AI 섹터 브리핑 & 뉴스
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                <div id="ai-loading" class="text-center py-5">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="text-muted mb-0">AI가 실시간 시장 트렌드를 분석하고 있습니다... (약 10~20초 소요)</p>
+                </div>
+                <div id="ai-content" class="bg-light rounded-4 p-4 text-dark d-none" style="white-space: pre-line; line-height: 1.8; font-size: 0.95rem;">
+                    <!-- AI content will be injected here -->
+                </div>
+                <div class="mt-3 text-muted x-small d-flex align-items-center">
+                    <i class="bi bi-info-circle me-2"></i> 실시간 데이터를 기반으로 AI가 생성한 분석 보고서입니다. 투자 결정 전 반드시 추가 검토를 권장합니다.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Coins List -->
+    <div class="col-12">
+        <h4 class="fw-bold mb-3 mt-2 px-1">주요 자산 분석</h4>
+        {% if display_coins %}
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-5 g-3">
+            {% for coin in display_coins %}
+            <div class="col">
+                <a href="{% url 'coin-detail-page' coin.pk %}" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm hover-shadow" style="border-radius: 20px; transition: 0.3s; background: #fff;">
+                        <div class="card-body p-4 text-center">
+                            <div class="rounded-circle bg-light p-3 mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                                <img src="{% if coin.image_url %}{{ coin.image_url }}{% else %}https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/{{ coin.symbol|lower }}.png{% endif %}" 
+                                     class="w-100" 
+                                     onerror="this.src='https://via.placeholder.com/40?text={{ coin.symbol|first }}';"
+                                     alt="{{ coin.symbol }}">
+                            </div>
+                            <h6 class="fw-bold mb-1 text-dark">{{ coin.symbol }}</h6>
+                            <p class="text-muted small mb-0">{{ coin.name }}</p>
+                            <hr class="my-3 opacity-10">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="x-small text-muted">유동성</span>
+                                <span class="small fw-bold text-primary">{{ coin.liquidity_grade|upper }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card border-0 shadow-sm p-5 text-center rounded-4" style="background: #fff;">
+            <i class="bi bi-search display-4 text-muted opacity-25 mb-3"></i>
+            <h5 class="text-muted">아직 이 섹터에 등록된 코인이 없습니다.</h5>
+            <p class="text-muted small mb-0">다른 섹터를 탐색하거나 데이터 업데이트를 기다려주세요.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .hover-shadow:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.08) !important;
+    }
+    .x-small {
+        font-size: 0.75rem;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const aiLoading = document.getElementById('ai-loading');
+    const aiContent = document.getElementById('ai-content');
+    const avgLoading = document.getElementById('avg-change-loading');
+    const avgContent = document.getElementById('avg-change-content');
+    const avgValue = document.getElementById('avg-change-value');
+
+    // 1. 마켓 데이터 비동기 호출 (페이지 로딩 속도 향상)
+    fetch("/api/sectors/{{ sector.pk }}/market_data/")
+        .then(response => response.json())
+        .then(data => {
+            if (avgLoading && avgContent && avgValue) {
+                avgLoading.classList.add('d-none');
+                avgValue.innerText = (data.avg_change >= 0 ? '+' : '') + data.avg_change + '%';
+                avgValue.className = 'fs-3 fw-bold ' + (data.avg_change >= 0 ? 'text-success' : 'text-danger');
+                avgContent.classList.remove('d-none');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching market data:', error);
+            if (avgLoading) avgLoading.innerHTML = '<span class="text-muted small">데이터 로드 실패</span>';
+        });
+
+    // 2. AI 분석 비동기 호출
+    if (aiLoading && aiContent) {
+        fetch("{% url 'sector-ai-analysis' sector.pk %}")
+            .then(response => response.json())
+            .then(data => {
+                aiLoading.classList.add('d-none');
+                aiContent.innerText = data.ai_brief;
+                aiContent.classList.remove('d-none');
+            })
+            .catch(error => {
+                console.error('Error fetching AI analysis:', error);
+                aiLoading.innerHTML = `
+                    <i class="bi bi-exclamation-triangle text-warning display-6 d-block mb-3"></i>
+                    <p class="text-muted mb-0">분석을 가져오는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.</p>
+                `;
+            });
+    }
+});
+</script>
+{% endblock %}
+

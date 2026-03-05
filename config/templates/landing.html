@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}환영합니다 | CoinReco{% endblock %}
+
+{% block content %}
+<style>
+    .landing-container {
+        padding-top: 60px;
+        background-color: #f3f4f6;
+    }
+    .landing-header {
+        text-align: center;
+        margin-bottom: 80px;
+        position: relative;
+        z-index: 20;
+        max-width: 900px;
+        margin-left: auto;
+        margin-right: auto;
+        padding: 80px 40px;
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border: 1px solid rgba(0,0,0,0.05);
+        border-radius: 48px;
+        color: #1a202c;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
+    }
+    .landing-header h1 {
+        font-size: 3.8rem;
+        font-weight: 800;
+        margin-bottom: 15px;
+        letter-spacing: -2px;
+        color: #111827;
+    }
+    .landing-header .highlight {
+        color: #3b82f6;
+        display: block;
+    }
+    .landing-header p {
+        font-size: 1.3rem;
+        color: #4b5563;
+        margin-bottom: 40px;
+        font-weight: 500;
+    }
+
+    /* Masonry Grid */
+    .masonry-grid {
+        columns: 5;
+        column-gap: 20px;
+        width: 100%;
+        max-width: 1300px;
+        margin: 0 auto;
+        padding: 0 25px 120px;
+    }
+    @media (max-width: 1200px) { .masonry-grid { columns: 4; } }
+    @media (max-width: 992px) { .masonry-grid { columns: 3; } }
+    @media (max-width: 768px) { .masonry-grid { columns: 2; } }
+
+    .masonry-item {
+        display: inline-block;
+        width: 100%;
+        margin-bottom: 20px;
+        border-radius: 28px;
+        overflow: hidden;
+        position: relative;
+        opacity: 0;
+        animation: smoothFadePulse 5s infinite ease-in-out;
+        pointer-events: none; /* 마우스 이벤트(호버, 클릭 등) 비활성화 */
+    }
+    
+    @keyframes smoothFadePulse {
+        0% { opacity: 0.3; transform: translateY(15px); }
+        50% { opacity: 1; transform: translateY(0); }
+        100% { opacity: 0.3; transform: translateY(15px); }
+    }
+
+    /* .masonry-item:hover 스타일 제거됨 */
+
+    .coin-card {
+        padding: 35px 25px;
+        border-radius: 28px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background: #ffffff;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        border: 1px solid #f1f5f9;
+        transition: all 0.3s ease;
+    }
+
+    /* 세련된 회색빛이 도는 파스텔톤 보더 스타일 */
+    .bg-1 { border-top: 6px solid #94a3b8; } /* Slate Blue-Gray */
+    .bg-2 { border-top: 6px solid #64748b; } /* Slate Gray */
+    .bg-3 { border-top: 6px solid #475569; } /* Dark Slate */
+    .bg-4 { border-top: 6px solid #3b82f6; } /* Primary Blue */
+    .bg-5 { border-top: 6px solid #60a5fa; } /* Soft Blue */
+    .bg-6 { border-top: 6px solid #93c5fd; } /* Light Blue */
+    .bg-7 { border-top: 6px solid #cbd5e1; } /* Light Slate */
+
+    .coin-icon {
+        width: 60px;
+        height: 60px;
+        object-fit: contain;
+        margin-bottom: 20px;
+        filter: grayscale(20%) drop-shadow(0 10px 15px rgba(0,0,0,0.08));
+    }
+
+    .coin-symbol-text {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #1e293b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .coin-name-text {
+        font-size: 0.9rem;
+        color: #64748b;
+        margin-top: 4px;
+        font-weight: 600;
+    }
+
+    .gradient-overlay {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 200px;
+        background: linear-gradient(to top, #f3f4f6 30%, rgba(243, 244, 246, 0));
+        pointer-events: none;
+        z-index: 10;
+    }
+</style>
+
+<div class="landing-container">
+    <div class="landing-header">
+        <h1>CoinReco</h1>
+        <span class="highlight mb-3">새로운 가상자산 인사이트</span>
+        <p>당신의 투자 성향을 분석하여 가장 적합한 코인을 제안합니다.</p>
+        <div class="mt-2">
+            <button class="btn btn-primary rounded-pill px-5 py-3 fw-bold fs-5 shadow-lg hover-up" data-bs-toggle="modal" data-bs-target="#loginModal" style="background-color: #3b82f6; border: none;">지금 시작하기 <i class="bi bi-arrow-right ms-2"></i></button>
+        </div>
+    </div>
+
+    <div class="masonry-grid">
+        {% for coin in display_coins %}
+        <div class="masonry-item">
+            <div class="coin-card {% cycle 'bg-1' 'bg-2' 'bg-3' 'bg-4' 'bg-5' 'bg-6' 'bg-7' %}">
+                <img src="{% if coin.image_url %}{{ coin.image_url }}{% else %}https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/{{ coin.symbol|lower }}.png{% endif %}" 
+                     class="coin-icon" 
+                     onerror="this.closest('.masonry-item').remove();"
+                     alt="{{ coin.symbol }}">
+                <div class="coin-symbol-text">{{ coin.symbol }}</div>
+                <div class="coin-name-text">{{ coin.name }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="gradient-overlay"></div>
+
+{% endblock %}

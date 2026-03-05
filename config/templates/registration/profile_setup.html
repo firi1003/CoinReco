@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}투자 성향 설정 | CoinReco{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 mb-4">
+    <div class="p-5 text-white rounded-4 shadow-sm position-relative overflow-hidden" style="background: linear-gradient(135deg, #007bff 0%, #00d2ff 100%);">
+      <div class="position-relative z-1 text-center">
+        <h1 class="display-6 fw-bold mb-3">반가워요! <span class="opacity-75">{{ user.username }}님</span> 😊</h1>
+        <p class="lead mb-0 opacity-90">당신에게 딱 맞는 코인을 찾기 위해 취향을 알려주세요.</p>
+      </div>
+      <i class="bi bi-rocket-takeoff position-absolute opacity-10" style="font-size: 15rem; right: -2rem; bottom: -4rem; transform: rotate(-15deg);"></i>
+    </div>
+  </div>
+
+  <div class="col-lg-10">
+    <div class="card border-0 shadow-sm mb-5" style="border-radius: 35px; background: #fdfdfd;">
+      <div class="card-body p-4 p-md-5">
+        <form method="post" id="profileSetupForm">
+          {% csrf_token %}
+          
+          <!-- 투자 성향 섹션 -->
+          <div class="mb-5">
+            <h4 class="fw-bold mb-4 d-flex align-items-center">
+              <span class="bg-primary bg-opacity-10 text-primary rounded-circle p-2 me-3 d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                <i class="bi bi-sliders2 fs-5"></i>
+              </span>
+              나의 투자 성향
+            </h4>
+            
+            <div class="row g-4">
+              {% for field in form %}
+                {% if field.name == "risk_score" or field.name == "trend_score" %}
+                <div class="col-md-6">
+                  <div class="p-4 bg-white rounded-4 shadow-sm border h-100">
+                    <label class="form-label fw-bold mb-3 d-flex justify-content-between align-items-center">
+                      <span class="text-dark">{{ field.label }}</span>
+                      <span class="badge bg-primary rounded-pill px-3 py-2" id="val-{{ field.name }}" style="font-size: 1rem;">5</span>
+                    </label>
+                    <div class="px-2 mt-4">
+                      <input type="range" name="{{ field.name }}" class="form-range custom-range" min="1" max="10" value="{{ field.value|default:5 }}" id="{{ field.id_for_label }}">
+                      <div class="d-flex justify-content-between mt-3 text-muted x-small fw-bold">
+                        <span class="bg-light px-2 py-1 rounded">1 (안정형)</span>
+                        <span class="bg-light px-2 py-1 rounded">10 (공격형)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- 관심 섹터 섹션 -->
+          <div class="mb-5 pt-2">
+            <h4 class="fw-bold mb-4 d-flex align-items-center">
+              <span class="bg-primary bg-opacity-10 text-primary rounded-circle p-2 me-3 d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                <i class="bi bi-heart fs-5"></i>
+              </span>
+              관심 및 비선호 섹터
+            </h4>
+            
+            <div class="row g-4">
+              {% for field in form %}
+                {% if field.name == "preferred_sectors" or field.name == "avoided_sectors" %}
+                <div class="col-md-6">
+                  <div class="mb-4 p-4 bg-white rounded-4 shadow-sm border h-100">
+                    <label class="form-label fw-bold mb-3 text-dark fs-5">{{ field.label }}</label>
+                    <div class="sector-container">
+                      <div class="d-flex flex-wrap gap-2">
+                        {% for choice in field %}
+                          <div class="sector-item">
+                            {{ choice.tag }}
+                            <label for="{{ choice.id_for_label }}">{{ choice.choice_label }}</label>
+                          </div>
+                        {% endfor %}
+                      </div>
+                    </div>
+                    {% if field.help_text %}<div class="form-text mt-3 bg-light p-2 rounded small"><i class="bi bi-info-circle me-1"></i> {{ field.help_text }}</div>{% endif %}
+                    {% for error in field.errors %}
+                      <div class="text-danger small mt-2 fw-bold">{{ error }}</div>
+                    {% endfor %}
+                  </div>
+                </div>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+          
+          <div class="d-grid gap-3 pt-3">
+            <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold py-3 shadow-lg hover-up" style="background: linear-gradient(135deg, #007bff 0%, #00d2ff 100%); border: none; font-size: 1.2rem;">
+              설정 완료하고 코인 추천 받기 <i class="bi bi-magic ms-2"></i>
+            </button>
+            <a href="{% url 'home' %}" class="btn btn-link text-muted text-decoration-none fw-bold mt-2">
+              <i class="bi bi-skip-forward me-1"></i> 나중에 설정하기
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .hover-up {
+    transition: all 0.3s ease;
+  }
+  .hover-up:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 25px rgba(0, 123, 255, 0.25) !important;
+  }
+
+  .custom-range::-webkit-slider-thumb {
+    width: 20px;
+    height: 20px;
+    background: #007bff;
+    border: 4px solid #fff;
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.3);
+    cursor: pointer;
+    -webkit-appearance: none;
+    border-radius: 50%;
+  }
+  
+  .custom-range::-webkit-slider-runnable-track {
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 10px;
+  }
+
+  .sector-item {
+    position: relative;
+  }
+
+  .sector-item label {
+    background: #fff;
+    padding: 10px 22px;
+    border-radius: 30px;
+    border: 1.5px solid #edf2f7;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #4a5568;
+    display: block;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  }
+
+  .sector-item input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .sector-item input[type="checkbox"]:checked + label {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+    box-shadow: 0 6px 15px rgba(0, 123, 255, 0.25);
+    transform: translateY(-2px);
+  }
+
+  .sector-item label:hover:not(:checked) {
+    background: #f0f7ff;
+    border-color: #007bff;
+    color: #007bff;
+    transform: translateY(-1px);
+  }
+
+  .x-small {
+    font-size: 0.8rem;
+  }
+</style>
+
+<script>
+  // 슬라이더 값 표시 로직
+  ['risk_score', 'trend_score'].forEach(name => {
+    const slider = document.querySelector(`input[name="${name}"]`);
+    if (slider) {
+      const badge = document.getElementById(`val-${name}`);
+      slider.addEventListener('input', (e) => {
+        badge.innerText = e.target.value;
+      });
+    }
+  });
+
+  // 체크박스 클릭 핸들링 (label 클릭 시 효과)
+  document.querySelectorAll('.sector-container label').forEach(label => {
+    label.addEventListener('click', function() {
+      // setTimeout을 주어 체크박스 상태 변경 후에 스타일이 적용되도록 함 (CSS :checked 로 이미 처리됨)
+    });
+  });
+</script>
+{% endblock %}
+

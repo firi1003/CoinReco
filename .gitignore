@@ -1,0 +1,61 @@
+# Python / Django 캐시 및 컴파일 파일
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 가상환경 (Virtual Environments)
+venv/
+.venv/
+env/
+bin/
+include/
+lib/
+lib64/
+share/
+
+# 환경 변수 및 비밀 설정 파일 (중요!)
+.env
+.env.local
+.env.dev
+.env.test
+config/.env
+**/.env
+
+# Django 로컬 데이터베이스 및 정적 파일
+db.sqlite3
+*.sqlite3
+local_settings.py
+staticfiles/
+media/
+
+# IDE 및 에디터 설정
+.vscode/
+.idea/
+.cursor/
+.DS_Store
+Thumbs.db
+
+# 로그 및 임시 파일
+*.log
+tmp/
+
+# 프로젝트 전용 로컬 파일 (공유하지 않을 파일들)
+coins_data.csv
+conversation_log.txt
+memo.txt
+대화내용.txt
+기획서-코인섹터-20x10.md
+금융명세서.pdf
+자율명세서.pdf
+기획서.txt
+
+# Node / frontend (필요한 경우 대비)
+node_modules/
+.next/
+dist/
+build/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

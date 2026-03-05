@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}TOP 10 코인 추천{% endblock %}
+{% block header_title %}Recommendations{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="row g-4">
+  <div class="col-12">
+    <div class="card border-0 shadow-sm p-4 rounded-4" style="background: #fff;">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h1 class="h3 fw-bold mb-1">🏆 당신을 위한 TOP 10 코인</h1>
+          <p class="text-muted mb-0 small">사용자님의 투자 성향과 실시간 시장 데이터를 분석한 결과입니다.</p>
+        </div>
+        <button id="refreshBtn" class="btn btn-primary rounded-pill px-4">
+          <i class="bi bi-arrow-clockwise me-1"></i>
+          <span id="btnText">분석 시작 (새로고침)</span>
+          <span id="spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+        </button>
+      </div>
+
+      <div id="alertPlaceholder"></div>
+
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="text-muted small text-uppercase">
+            <tr>
+              <th class="border-0 ps-0">순위</th>
+              <th class="border-0">코인</th>
+              <th class="border-0">시가총액</th>
+              <th class="border-0">섹터</th>
+              <th class="border-0">유동성</th>
+              <th class="border-0 text-end pe-0">추천 점수</th>
+            </tr>
+          </thead>
+          <tbody id="recTableBody" class="border-top-0">
+            {% for rec in recs %}
+            <tr class="rec-row border-bottom-0" data-rec-id="{{ rec.id }}" style="cursor: pointer;">
+              <td class="ps-0 border-0">
+                <span class="badge {% if rec.rank <= 3 %}bg-primary{% else %}bg-light text-dark{% endif %} rounded-pill px-3 py-2">
+                  TOP {{ rec.rank }}
+                </span>
+              </td>
+              <td class="border-0">
+                <div class="d-flex align-items-center">
+                  <div class="rounded-circle bg-light p-2 me-3 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                    <img src="{% if rec.coin.image_url %}{{ rec.coin.image_url }}{% else %}https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/{{ rec.coin.symbol|lower }}.png{% endif %}" 
+                         class="w-100" 
+                         onerror="this.src='https://via.placeholder.com/20?text={{ rec.coin.symbol|first }}';"
+                         alt="{{ rec.coin.symbol }}">
+                  </div>
+                  <div>
+                    <span class="fw-bold text-dark">{{ rec.coin.symbol }}</span>
+                    <span class="ms-1 text-muted small">{{ rec.coin.name }}</span>
+                    {% if rec.is_avoided %}
+                      <span class="ms-2 badge bg-warning text-dark x-small" title="비선호 섹터이지만 다른 점수가 높아 추천되었습니다.">주의</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </td>
+              <td class="border-0 text-muted small">${{ rec.coin.market_cap|default:"-" }}</td>
+              <td class="border-0">
+                {% for sector in rec.coin.sectors.all|slice:":2" %}
+                  <span class="badge bg-light text-muted fw-normal rounded-pill px-2">{{ sector.name }}</span>
+                {% endfor %}
+              </td>
+              <td class="border-0">
+                <span class="text-dark small">{{ rec.coin.get_liquidity_grade_display }}</span>
+              </td>
+              <td class="border-0 text-end pe-0">
+                <span class="text-primary fw-bold">{{ rec.total_score }}점</span>
+                <i class="bi bi-chevron-down ms-2 text-muted small"></i>
+              </td>
+            </tr>
+            <tr id="detail-{{ rec.id }}" class="d-none">
+              <td colspan="6" class="p-0 border-0">
+                <div class="bg-light rounded-4 py-4 px-4 my-2 mx-0 shadow-inner">
+                  <div class="row align-items-center g-4">
+                    <div class="col-md-7">
+                      <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle bg-white shadow-sm p-2 me-3 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                          <i class="bi bi-robot text-primary fs-5"></i>
+                        </div>
+                        <h5 class="fw-bold mb-0">알고리즘 분석 결과</h5>
+                      </div>
+                      <p class="mb-3 text-muted small" style="line-height: 1.5;">
+                        투자 프로필(위험 {{ user.profile.risk_score }}, 유행 {{ user.profile.trend_score }})을 토대로 산출된 분석 결과입니다.
+                      </p>
+                      <ul class="list-unstyled mb-3">
+                        <li class="mb-2 d-flex align-items-start">
+                          <i class="bi bi-check2-circle text-primary me-2 mt-1"></i>
+                          <span class="small"><strong>섹터 적합성:</strong> {% if rec.sector_score > 0 %}선호 일치 ({{ rec.sector_score }}점){% else %}지표 우수{% endif %}</span>
+                        </li>
+                        <li class="mb-2 d-flex align-items-start">
+                          <i class="bi bi-check2-circle text-primary me-2 mt-1"></i>
+                          <span class="small"><strong>투자 성향:</strong> 지표 부합 ({{ rec.risk_score }}점)</span>
+                        </li>
+                        <li class="mb-2 d-flex align-items-start">
+                          <i class="bi bi-check2-circle text-primary me-2 mt-1"></i>
+                          <span class="small"><strong>시장 트렌드:</strong> 반응성 확인 ({{ rec.trend_score }}점)</span>
+                        </li>
+                      </ul>
+                      <a href="{% url 'coin-detail-page' rec.coin.pk %}" class="btn btn-white border shadow-sm btn-sm rounded-pill px-3 py-1">
+                        상세 상세보기 <i class="bi bi-arrow-right ms-1"></i>
+                      </a>
+                    </div>
+                    <div class="col-md-5">
+                      <div class="bg-white py-3 px-3 rounded-4 shadow-sm text-center">
+                        <canvas id="chart-{{ rec.id }}" style="max-height: 180px;"></canvas>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="text-center py-5 text-muted">
+                <i class="bi bi-clipboard2-data display-1 opacity-10 d-block mb-3"></i>
+                <p class="mb-0">분석 시작 버튼을 눌러 맞춤형 추천을 받아보세요!</p>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .shadow-inner {
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.03);
+  }
+  .x-small {
+    font-size: 0.75rem;
+  }
+  .btn-white {
+    background: #fff;
+    color: #444;
+  }
+  .btn-white:hover {
+    background: #f8f9fa;
+  }
+</style>
+
+<script>
+  // 행 클릭 시 상세 리포트 토글 및 차트 렌더링
+  document.querySelectorAll('.rec-row').forEach(row => {
+    row.addEventListener('click', function() {
+      const recId = this.dataset.recId;
+      const detailRow = document.getElementById(`detail-${recId}`);
+      const chevron = this.querySelector('.bi-chevron-down');
+      
+      if (detailRow.classList.contains('d-none')) {
+        detailRow.classList.remove('d-none');
+        chevron.style.transform = 'rotate(180deg)';
+        renderChart(recId);
+      } else {
+        detailRow.classList.add('d-none');
+        chevron.style.transform = 'rotate(0deg)';
+      }
+    });
+  });
+
+  const charts = {};
+
+  function renderChart(recId) {
+    if (charts[recId]) return; // 이미 렌더링됨
+
+    const rec = {% if recs %}[
+      {% for rec in recs %}
+      {
+        id: "{{ rec.id }}",
+        sector: {{ rec.sector_score }},
+        risk: {{ rec.risk_score }},
+        trend: {{ rec.trend_score }}
+      },
+      {% endfor %}
+    ]{% else %}[]{% endif %}.find(r => r.id == recId);
+
+    const ctx = document.getElementById(`chart-${recId}`).getContext('2d');
+    charts[recId] = new Chart(ctx, {
+      type: 'radar',
+      data: {
+        labels: ['섹터 적합성', '위험 선호도', '트렌드 일치'],
+        datasets: [{
+          label: '분석 지표',
+          data: [rec.sector, rec.risk, rec.trend],
+          backgroundColor: 'rgba(13, 110, 253, 0.2)',
+          borderColor: '#0d6efd',
+          pointBackgroundColor: '#0d6efd',
+          pointBorderColor: '#fff',
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: '#0d6efd'
+        }]
+      },
+      options: {
+        scales: {
+          r: {
+            angleLines: { display: false },
+            suggestedMin: 0,
+            suggestedMax: 5
+          }
+        },
+        plugins: {
+          legend: { display: false }
+        }
+      }
+    });
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', function() {
+    const btn = this;
+    const btnText = document.getElementById('btnText');
+    const spinner = document.getElementById('spinner');
+    
+    btn.disabled = true;
+    btnText.innerText = '추천 알고리즘 가동 중...';
+    spinner.classList.remove('d-none');
+
+    fetch("{% url 'recommendations-api' %}", {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": "{{ csrf_token }}",
+        "Content-Type": "application/json"
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      location.reload();
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      btn.disabled = false;
+      btnText.innerText = '분석 시작 (새로고침)';
+      spinner.classList.add('d-none');
+    });
+  });
+</script>
+{% endblock %}

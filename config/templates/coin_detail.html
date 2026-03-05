@@ -1,0 +1,576 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}{{ coin.symbol }} | 상세 정보{% endblock %}
+{% block header_title %}{{ coin.symbol }} Details{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- Left Side: Coin Info & Analysis -->
+  <div class="col-md-8">
+    <!-- Header -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start">
+          <div class="d-flex align-items-center">
+            <div class="rounded-circle bg-light p-2 me-3 d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                <img src="{% if coin.image_url %}{{ coin.image_url }}{% else %}https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/{{ coin.symbol|lower }}.png{% endif %}" 
+                     class="w-100" 
+                     onerror="this.src='https://via.placeholder.com/40?text={{ coin.symbol|first }}';"
+                     alt="{{ coin.symbol }}">
+            </div>
+            <div>
+              <h1 class="h2 mb-0">{{ coin.name }} ({{ coin.symbol }})</h1>
+              <p class="text-muted mb-0">
+                {{ coin.main_network }} · {{ coin.launch_year }}년 출시 · 유동성 {{ coin.get_liquidity_grade_display }}
+              </p>
+            </div>
+          </div>
+          <div class="text-end">
+            <div class="h4 mb-0 text-primary">
+              {% if coin.market_cap %}
+                ${{ coin.market_cap|floatformat:0|intcomma }}
+              {% else %}
+                -
+              {% endif %}
+            </div>
+            {% if market_cap_krw %}
+              <div class="text-muted small">≈ ₩{{ market_cap_krw|floatformat:0|intcomma }}</div>
+            {% endif %}
+            <small class="text-muted text-uppercase">Market Cap</small>
+          </div>
+        </div>
+        <hr>
+        <div class="mb-3">
+          {% for sector in coin.sectors.all %}
+            <span class="badge bg-primary-subtle text-primary me-1">{{ sector.name }}</span>
+          {% endfor %}
+          {% for tag in coin.feature_tags.all %}
+            <span class="badge bg-secondary-subtle text-secondary me-1">#{{ tag.name }}</span>
+          {% endfor %}
+        </div>
+        <p class="lead" style="font-size: 1rem; line-height: 1.8;">
+          {{ coin.description|default:"코인에 대한 상세 설명이 준비 중입니다." }}
+        </p>
+        <div class="mt-3">
+          {% if coin.website %}<a href="{{ coin.website }}" class="btn btn-outline-dark btn-sm me-2" target="_blank">공식 사이트</a>{% endif %}
+          {% if coin.whitepaper %}<a href="{{ coin.whitepaper }}" class="btn btn-outline-dark btn-sm" target="_blank">백서 보기</a>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Real-time Chart Section -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h5 class="card-title mb-0">실시간 가격 추이 (캔들차트)</h5>
+          <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn btn-outline-primary active" onclick="updateChart('1')">일봉</button>
+            <button type="button" class="btn btn-outline-primary" onclick="updateChart('7')">주봉</button>
+            <button type="button" class="btn btn-outline-primary" onclick="updateChart('30')">월봉</button>
+          </div>
+        </div>
+        <div id="chartContainer" style="position: relative; min-height: 400px;">
+          <!-- 로딩 스피너 -->
+          <div id="chartLoading" class="d-none position-absolute top-50 start-50 translate-middle text-center" style="z-index: 10;">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted small">데이터를 불러오는 중...</p>
+          </div>
+          <div id="candleChart"></div>
+        </div>
+        
+        <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+        <script>
+          let chart;
+          const loadingEl = document.getElementById('chartLoading');
+          const chartEl = document.getElementById('candleChart');
+          
+          function initChart(data) {
+            const options = {
+              series: [{
+                data: data.map(d => ({
+                  x: new Date(d[0]),
+                  y: [d[1], d[2], d[3], d[4]]
+                }))
+              }],
+              chart: {
+                type: 'candlestick',
+                height: 400,
+                toolbar: { show: false },
+                animations: { enabled: false } // 로딩 시 답답함을 줄이기 위해 애니메이션 끔
+              },
+              xaxis: {
+                type: 'datetime'
+              },
+              yaxis: {
+                tooltip: { enabled: true },
+                labels: {
+                  formatter: v => '$' + v.toLocaleString()
+                }
+              },
+              plotOptions: {
+                candlestick: {
+                  colors: {
+                    upward: '#ef5350',
+                    downward: '#26a69a'
+                  }
+                }
+              }
+            };
+
+            if (chart) {
+              chart.destroy();
+            }
+            chart = new ApexCharts(chartEl, options);
+            chart.render();
+          }
+
+          function updateChart(days) {
+            // 로딩 표시 시작
+            loadingEl.classList.remove('d-none');
+            chartEl.style.opacity = '0.3';
+
+            // 버튼 활성화 상태 변경
+            document.querySelectorAll('.btn-group .btn').forEach(btn => {
+              btn.classList.remove('active');
+              const text = days === '1' ? '일봉' : days === '7' ? '주봉' : '월봉';
+              if (btn.innerText.includes(text)) btn.classList.add('active');
+            });
+
+            const coinId = "{{ coin.id }}";
+            fetch(`/api/coins/${coinId}/ohlc/?days=${days}`)
+              .then(res => res.json())
+              .then(data => {
+                const ohlcData = data.ohlc || data;
+                if (ohlcData && Array.isArray(ohlcData) && ohlcData.length > 0) {
+                  initChart(ohlcData);
+                } else {
+                  console.error("차트 데이터를 불러올 수 없거나 형식이 올바르지 않습니다.", data);
+                }
+              })
+              .catch(err => console.error("차트 업데이트 중 오류 발생:", err))
+              .finally(() => {
+                // 로딩 표시 종료
+                loadingEl.classList.add('d-none');
+                chartEl.style.opacity = '1';
+              });
+          }
+
+          // 초기 로드 (일봉)
+          document.addEventListener('DOMContentLoaded', () => {
+            updateChart('1');
+            fetchAIAnalysis();
+          });
+
+          function fetchAIAnalysis() {
+            const coinId = "{{ coin.id }}";
+            const loadingEl = document.getElementById('aiAnalysisLoading');
+            const contentEl = document.getElementById('aiAnalysisContent');
+
+            fetch(`/api/coins/${coinId}/ai_analysis/`)
+              .then(res => res.json())
+              .then(data => {
+                if (data.analysis) {
+                  contentEl.innerText = data.analysis;
+                  contentEl.classList.remove('d-none');
+                  loadingEl.classList.add('d-none');
+                } else {
+                  throw new Error("분석 데이터를 가져오지 못했습니다.");
+                }
+              })
+              .catch(err => {
+                console.error("AI Analysis error:", err);
+                contentEl.innerText = "분석 데이터를 가져오는 중 오류가 발생했습니다.";
+                contentEl.classList.remove('d-none');
+                loadingEl.classList.add('d-none');
+              });
+          }
+        </script>
+      </div>
+    </div>
+
+    <!-- AI Analysis Report Section -->
+    <div class="card shadow-sm border-0 mb-4 overflow-hidden" style="border-radius: 24px;">
+      <div class="card-body p-0">
+        <div class="py-3 px-4 text-white" style="background: linear-gradient(135deg, #007bff 0%, #00d2ff 100%);">
+          <div class="d-flex align-items-center">
+            <div class="bg-white text-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+              <i class="bi bi-robot fs-5"></i>
+            </div>
+            <h5 class="card-title mb-0 fw-bold">AI 전문가 분석 리포트</h5>
+          </div>
+        </div>
+        <div class="p-4 bg-white">
+          <div id="aiAnalysisContainer" class="p-3 rounded-4 border-0 bg-light">
+            <div id="aiAnalysisLoading" class="text-center py-3">
+              <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+              <span class="ms-2 text-muted small fw-medium">AI가 심층 분석 중입니다...</span>
+            </div>
+            <p id="aiAnalysisContent" class="mb-0 text-dark d-none" style="white-space: pre-wrap; line-height: 1.8; font-size: 0.95rem;"></p>
+          </div>
+          <div class="mt-3 text-end">
+            <small class="text-muted" style="font-size: 0.75rem;">
+              <i class="bi bi-info-circle me-1"></i>본 분석은 참고용이며 투자 결과에 대한 책임을 지지 않습니다.
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Community Section -->
+    <div class="card shadow-sm border-0" style="border-radius: 24px;">
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center mb-4">
+          <div class="bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+            <i class="bi bi-chat-dots fs-5"></i>
+          </div>
+          <h5 class="card-title mb-0 fw-bold">커뮤니티 의견</h5>
+        </div>
+        
+        {% if user.is_authenticated %}
+          <form id="commentForm" class="mb-4">
+            {% csrf_token %}
+            <div class="p-3 bg-light rounded-4">
+              <textarea name="content" class="form-control border-0 bg-transparent mb-2" placeholder="이 코인에 대한 생각을 공유해주세요..." rows="3" style="resize: none; box-shadow: none;" required></textarea>
+              <div class="text-end">
+                <button class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" type="submit">의견 남기기</button>
+              </div>
+            </div>
+          </form>
+        {% else %}
+          <div class="alert bg-light border-0 text-center mb-4 py-4 rounded-4">
+            <p class="mb-2 text-muted small">의견을 공유하고 싶으신가요?</p>
+            <a href="{% url 'login' %}" class="btn btn-outline-primary btn-sm rounded-pill px-4 fw-bold">로그인 후 참여하기</a>
+          </div>
+        {% endif %}
+
+        <div id="commentList">
+          {% for c in comments %}
+            <div class="d-flex mb-4">
+              <!-- Avatar -->
+              <div class="flex-shrink-0 me-3">
+                <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center fw-bold text-secondary" style="width: 40px; height: 40px; font-size: 0.9rem;">
+                  {{ c.user.username|first|upper }}
+                </div>
+              </div>
+              
+              <!-- Comment Content -->
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center mb-1">
+                  <span class="fw-bold text-dark small me-2">@{{ c.user.username }}</span>
+                  <small class="text-muted x-small">{{ c.created_at|timesince }} 전</small>
+                </div>
+                
+                <div class="text-dark mb-2" id="comment-content-{{ c.id }}" style="font-size: 0.9rem; line-height: 1.4;">{{ c.content }}</div>
+                
+                <!-- Action Buttons (Like/Dislike/Reply) -->
+                <div class="d-flex align-items-center mb-2">
+                  <button class="btn btn-link btn-sm p-0 text-dark me-3 text-decoration-none d-flex align-items-center">
+                    <i class="bi bi-hand-thumbs-up me-1"></i>
+                    <span class="x-small">0</span>
+                  </button>
+                  <button class="btn btn-link btn-sm p-0 text-dark me-3 text-decoration-none">
+                    <i class="bi bi-hand-thumbs-down"></i>
+                  </button>
+                  <button class="btn btn-link btn-sm p-0 text-dark fw-bold text-decoration-none x-small" onclick="toggleReply('{{ c.id }}')">답글</button>
+                  
+                  {% if user == c.user %}
+                    <div class="dropdown ms-2">
+                      <button class="btn btn-link btn-sm text-muted p-0" data-bs-toggle="dropdown">
+                        <i class="bi bi-three-dots-vertical" style="font-size: 0.8rem;"></i>
+                      </button>
+                      <ul class="dropdown-menu border-0 shadow-sm rounded-3">
+                        <li><button class="dropdown-item x-small" onclick="toggleEdit('{{ c.id }}')"><i class="bi bi-pencil me-2"></i>수정</button></li>
+                        <li><button class="dropdown-item x-small text-danger" onclick="deleteComment('{{ c.id }}')"><i class="bi bi-trash me-2"></i>삭제</button></li>
+                      </ul>
+                    </div>
+                  {% endif %}
+                </div>
+
+                <!-- Edit Form -->
+                <form id="editForm-{{ c.id }}" class="mt-2 d-none mb-3" onsubmit="updateComment(event, '{{ c.id }}')">
+                  <div class="p-3 bg-white border rounded-4">
+                    <textarea name="content" class="form-control border-0 p-0 mb-2" rows="2" style="resize: none; box-shadow: none;" required>{{ c.content }}</textarea>
+                    <div class="text-end">
+                      <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 me-1" type="button" onclick="toggleEdit('{{ c.id }}')">취소</button>
+                      <button class="btn btn-sm btn-success rounded-pill px-3" type="submit">저장</button>
+                    </div>
+                  </div>
+                </form>
+
+                <!-- Replies Toggle -->
+                {% if c.replies.exists %}
+                  <button class="btn btn-link btn-sm p-0 text-primary fw-bold text-decoration-none d-flex align-items-center mb-2" 
+                          type="button" data-bs-toggle="collapse" data-bs-target="#replies-{{ c.id }}" 
+                          style="font-size: 0.85rem;">
+                    <i class="bi bi-caret-down-fill me-2"></i>
+                    답글 {{ c.replies.count }}개
+                  </button>
+                  
+                  <div class="collapse" id="replies-{{ c.id }}">
+                    {% for reply in c.replies.all %}
+                      <div class="d-flex mt-3">
+                        <div class="flex-shrink-0 me-3">
+                          <div class="rounded-circle bg-light d-flex align-items-center justify-content-center fw-bold text-muted" style="width: 24px; height: 24px; font-size: 0.7rem;">
+                            {{ reply.user.username|first|upper }}
+                          </div>
+                        </div>
+                        <div class="flex-grow-1">
+                          <div class="d-flex align-items-center mb-1">
+                            <span class="fw-bold text-dark x-small me-2">@{{ reply.user.username }}</span>
+                            <small class="text-muted" style="font-size: 0.65rem;">{{ reply.created_at|timesince }} 전</small>
+                          </div>
+                          <div class="text-dark mb-1" id="comment-content-{{ reply.id }}" style="font-size: 0.85rem;">{{ reply.content }}</div>
+                          
+                          <div class="d-flex align-items-center">
+                            <i class="bi bi-hand-thumbs-up text-muted me-3" style="font-size: 0.75rem;"></i>
+                            <i class="bi bi-hand-thumbs-down text-muted me-3" style="font-size: 0.75rem;"></i>
+                            {% if user == reply.user %}
+                              <div class="dropdown">
+                                <button class="btn btn-link btn-sm text-muted p-0" data-bs-toggle="dropdown">
+                                  <i class="bi bi-three-dots-vertical" style="font-size: 0.7rem;"></i>
+                                </button>
+                                <ul class="dropdown-menu border-0 shadow-sm rounded-3">
+                                  <li><button class="dropdown-item x-small" onclick="toggleEdit('{{ reply.id }}')">수정</button></li>
+                                  <li><button class="dropdown-item x-small text-danger" onclick="deleteComment('{{ reply.id }}')">삭제</button></li>
+                                </ul>
+                              </div>
+                            {% endif %}
+                          </div>
+
+                          <!-- Edit Form for Reply -->
+                          <form id="editForm-{{ reply.id }}" class="mt-2 d-none mb-3" onsubmit="updateComment(event, '{{ reply.id }}')">
+                            <div class="p-2 border rounded-4 bg-white">
+                              <textarea name="content" class="form-control border-0 p-0 mb-2 x-small" rows="2" style="resize: none; box-shadow: none;" required>{{ reply.content }}</textarea>
+                              <div class="text-end">
+                                <button class="btn btn-xs btn-outline-secondary rounded-pill px-2" type="button" onclick="toggleEdit('{{ reply.id }}')">취소</button>
+                                <button class="btn btn-xs btn-success rounded-pill px-2" type="submit">저장</button>
+                              </div>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+                
+                {% if user.is_authenticated %}
+                  <form id="replyForm-{{ c.id }}" class="mt-2 d-none" onsubmit="postReply(event, '{{ c.id }}')">
+                    <div class="input-group input-group-sm mb-3">
+                      <input type="text" name="content" class="form-control border-0 border-bottom rounded-0 ps-0 bg-transparent" placeholder="답글을 남겨주세요..." style="box-shadow: none;" required>
+                      <button class="btn btn-link text-primary fw-bold text-decoration-none" type="submit">작성</button>
+                      <button class="btn btn-link text-muted text-decoration-none" type="button" onclick="toggleReply('{{ c.id }}')">취소</button>
+                    </div>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+          {% empty %}
+            <div class="text-center py-5 text-muted">
+              <i class="bi bi-chat-dots display-6 d-block mb-3 opacity-25"></i>
+              <p>아직 의견이 없습니다. 첫 번째 의견을 남겨보세요!</p>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Side: Stats & Supply -->
+  <div class="col-md-4">
+    <div class="sticky-top" style="top: 20px;">
+      <!-- Supply Information Card -->
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+          <h5 class="card-title mb-4">공급량 정보</h5>
+          <div class="mb-3">
+            <label class="text-muted small">총 공급량 (Total Supply)</label>
+            <div class="fw-bold">{{ coin.supply_total|default:"정보 없음" }} {{ coin.symbol }}</div>
+          </div>
+          <div class="mb-3">
+            <label class="text-muted small">유통 공급량 (Circulating Supply)</label>
+            <div class="fw-bold">{{ coin.supply_circulating|default:"정보 없음" }} {{ coin.symbol }}</div>
+          </div>
+          {% if coin.supply_total and coin.supply_circulating %}
+            <div class="progress mb-2" style="height: 8px;">
+              {% widthratio coin.supply_circulating coin.supply_total 100 as pct %}
+              <div class="progress-bar bg-success" style="width: {{ pct }}%"></div>
+            </div>
+            <small class="text-muted">유통 비율: {{ pct }}%</small>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Social Sentiment Voting Section -->
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-4 text-center">
+          <h5 class="card-title mb-3">이 코인, 지금 살까요?</h5>
+          <p class="text-muted small mb-4">다른 사용자들의 투자 심리를 확인해보세요.</p>
+          
+          <div class="row g-2 mb-4 justify-content-center">
+            <div style="width: 40%;">
+              <button id="btnBuy" class="btn {% if user_vote == 'buy' %}btn-success{% else %}btn-outline-success{% endif %} w-100 py-2 d-flex align-items-center justify-content-center" onclick="submitVote('buy')">
+                <span class="fs-5 me-2">🚀</span>
+                <span class="fw-bold">살래요</span>
+              </button>
+            </div>
+            <div style="width: 40%;">
+              <button id="btnSell" class="btn {% if user_vote == 'sell' %}btn-danger{% else %}btn-outline-danger{% endif %} w-100 py-2 d-flex align-items-center justify-content-center" onclick="submitVote('sell')">
+                <span class="fs-5 me-2">📉</span>
+                <span class="fw-bold">관망</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="voteStats" class="{% if voting_stats.total_votes == 0 and not user_vote %}d-none{% endif %}">
+            <div class="d-flex justify-content-between mb-2 small">
+              <span class="text-success fw-bold">살래요 {{ voting_stats.buy_pct }}%</span>
+              <span class="text-danger fw-bold">관망 {{ voting_stats.sell_pct }}%</span>
+            </div>
+            <div class="progress mb-2" style="height: 12px; border-radius: 6px;">
+              <div id="buyBar" class="progress-bar bg-success" role="progressbar" style="width: {{ voting_stats.buy_pct }}%"></div>
+              <div id="sellBar" class="progress-bar bg-danger" role="progressbar" style="width: {{ voting_stats.sell_pct }}%"></div>
+            </div>
+            <small class="text-muted">총 <span id="totalVotes">{{ voting_stats.total_votes }}</span>명 참여 중</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleReply(id) {
+    const form = document.getElementById('replyForm-' + id);
+    form.classList.toggle('d-none');
+  }
+
+  function toggleEdit(id) {
+    const content = document.getElementById('comment-content-' + id);
+    const form = document.getElementById('editForm-' + id);
+    content.classList.toggle('d-none');
+    form.classList.toggle('d-none');
+  }
+
+  function updateComment(e, id) {
+    e.preventDefault();
+    const content = e.target.elements['content'].value;
+    
+    fetch(`/api/comments/${id}/`, {
+      method: "PATCH",
+      headers: {
+        "X-CSRFToken": "{{ csrf_token }}",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ content: content })
+    })
+    .then(r => {
+      if (r.ok) location.reload();
+      else alert("수정 권한이 없거나 오류가 발생했습니다.");
+    });
+  }
+
+  function deleteComment(id) {
+    if (!confirm("정말로 삭제하시겠습니까?")) return;
+    
+    fetch(`/api/comments/${id}/`, {
+      method: "DELETE",
+      headers: {
+        "X-CSRFToken": "{{ csrf_token }}",
+      }
+    })
+    .then(r => {
+      if (r.ok) location.reload();
+      else alert("삭제 권한이 없거나 오류가 발생했습니다.");
+    });
+  }
+
+  // 간단한 AJAX 처리 (새로고침 없이 댓글 추가 등은 나중에 고도화 가능)
+  document.getElementById('commentForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const content = this.elements['content'].value;
+    postComment(content, null);
+  });
+
+  function postReply(e, parentId) {
+    e.preventDefault();
+    const input = e.target.elements['content'];
+    postComment(input.value, parentId);
+  }
+
+  function postComment(content, parentId) {
+    fetch("{% url 'comment-list' %}", {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": "{{ csrf_token }}",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        coin: "{{ coin.id }}",
+        content: content,
+        parent: parentId
+      })
+    })
+    .then(r => r.json())
+    .then(d => location.reload());
+  }
+
+  function submitVote(val) {
+    {% if not user.is_authenticated %}
+      alert("투표하려면 로그인이 필요합니다.");
+      return;
+    {% endif %}
+
+    const coinId = "{{ coin.id }}";
+    fetch(`/api/coins/${coinId}/vote/`, {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": "{{ csrf_token }}",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ vote: val })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        // UI 즉시 업데이트
+        document.getElementById('voteStats').classList.remove('d-none');
+        document.getElementById('buyBar').style.width = data.buy_pct + '%';
+        document.getElementById('sellBar').style.width = data.sell_pct + '%';
+        document.querySelector('#voteStats .text-success').innerText = `살래요 ${data.buy_pct}%`;
+        document.querySelector('#voteStats .text-danger').innerText = `관망 ${data.sell_pct}%`;
+        document.getElementById('totalVotes').innerText = data.total_votes;
+
+        // 버튼 스타일 업데이트
+        const btnBuy = document.getElementById('btnBuy');
+        const btnSell = document.getElementById('btnSell');
+        
+        if (data.user_vote === 'buy') {
+          btnBuy.classList.replace('btn-outline-success', 'btn-success');
+          btnSell.classList.replace('btn-danger', 'btn-outline-danger');
+        } else {
+          btnSell.classList.replace('btn-outline-danger', 'btn-danger');
+          btnBuy.classList.replace('btn-success', 'btn-outline-success');
+        }
+      } else {
+        alert(data.error || "투표 처리 중 오류가 발생했습니다.");
+      }
+    })
+    .catch(err => {
+      console.error("Voting error:", err);
+      alert("로그인이 필요하거나 요청을 처리할 수 없습니다.");
+    });
+  }
+</script>
+
+<style>
+  .last-child-border-0:last-child {
+    border-bottom: 0 !important;
+  }
+  .btn-xs {
+    padding: 0.1rem 0.4rem;
+    font-size: 0.7rem;
+  }
+</style>
+{% endblock %}

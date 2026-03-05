@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+{% block title %}프로필 | CoinReco{% endblock %}
+{% block content %}
+<style>
+    .profile-card {
+        background: #fff;
+        border-radius: 24px;
+        padding: 40px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        margin-bottom: 30px;
+    }
+    .profile-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+    .profile-avatar {
+        width: 80px;
+        height: 80px;
+        background: #f0f0f0;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        margin-right: 20px;
+        color: #666;
+    }
+    .section-title {
+        font-weight: 700;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #f8fafc;
+        color: #1f2937;
+    }
+    .range-label {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        font-weight: 600;
+    }
+    .form-range::-webkit-slider-runnable-track { background: #e9ecef; border-radius: 10px; height: 8px; }
+    .form-range::-webkit-slider-thumb { background: var(--accent-color); margin-top: -6px; }
+
+    .sector-selector {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 12px;
+        margin-bottom: 30px;
+    }
+    .sector-chip {
+        cursor: pointer;
+        padding: 12px 15px;
+        border-radius: 18px;
+        border: 2px solid #f0f0f0;
+        text-align: center;
+        transition: all 0.2s;
+        font-weight: 600;
+        user-select: none;
+        background: #fff;
+    }
+    .sector-chip.preferred {
+        background-color: #eff6ff;
+        border-color: #3b82f6;
+        color: #1d4ed8;
+    }
+    .sector-chip.avoided {
+        background-color: #fff1f2;
+        border-color: #f43f5e;
+        color: #be123c;
+    }
+    .sector-chip:hover {
+        border-color: var(--accent-color);
+        transform: translateY(-2px);
+    }
+
+    .save-btn {
+        background-color: var(--accent-color);
+        color: white;
+        border: none;
+        padding: 16px 48px;
+        border-radius: 40px;
+        font-weight: 700;
+        font-size: 1rem;
+        transition: all 0.3s;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+    }
+    .save-btn:hover {
+        background-color: #2563eb;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+    }
+
+    .profile-divider {
+        height: 2px;
+        background-color: #cbd5e1;
+        margin: 50px 0;
+        border: none;
+        position: relative;
+    }
+
+    /* AI Persona Section Styling */
+    .ai-persona-section {
+        margin-top: 50px;
+        padding: 40px;
+        border-radius: 35px;
+        background: linear-gradient(135deg, #007bff 0%, #00c6ff 100%);
+        position: relative;
+        overflow: hidden;
+        color: white;
+    }
+    .ai-persona-section::before {
+        content: '';
+        position: absolute;
+        top: -50px;
+        right: -50px;
+        width: 200px;
+        height: 200px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+    .ai-persona-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 25px;
+        padding: 25px;
+        color: #1f2937;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+    }
+    .analyze-btn {
+        background: #fff;
+        color: var(--accent-color);
+        border: none;
+        padding: 10px 25px;
+        border-radius: 20px;
+        font-weight: 700;
+        transition: all 0.3s;
+        cursor: pointer;
+        position: relative;
+        z-index: 2;
+    }
+    .analyze-btn:hover {
+        background: #f8fafc;
+        transform: scale(1.05);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+</style>
+
+<div class="container py-5">
+    <div class="profile-card">
+        <div class="profile-header">
+            <div class="profile-avatar">
+                <i class="bi bi-person"></i>
+            </div>
+            <div>
+                <h2 class="mb-0 fw-bold">{{ user.username }}님의 투자 프로필</h2>
+                <p class="text-muted mb-0">{{ profile.full_name|default:"사용자" }}</p>
+            </div>
+        </div>
+
+        <form id="profileUpdateForm">
+            {% csrf_token %}
+            
+            <div class="row">
+                <!-- 투자 성향 설정 -->
+                <div class="col-12 mb-4">
+                    <h4 class="section-title">투자 성향</h4>
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="range-label">
+                                <span>위험 선호도</span>
+                                <span id="risk_val" class="text-primary">{{ profile.risk_score }}</span>
+                            </div>
+                            <input type="range" class="form-range" min="1" max="10" name="risk_score" value="{{ profile.risk_score }}" id="risk_range">
+                            <div class="d-flex justify-content-between small text-muted">
+                                <span>안정형</span>
+                                <span>공격형</span>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-4">
+                            <div class="range-label">
+                                <span>유행 민감도</span>
+                                <span id="trend_val" class="text-primary">{{ profile.trend_score }}</span>
+                            </div>
+                            <input type="range" class="form-range" min="1" max="10" name="trend_score" value="{{ profile.trend_score }}" id="trend_range">
+                            <div class="d-flex justify-content-between small text-muted">
+                                <span>근본 중시</span>
+                                <span>트렌드 추구</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 섹터 설정 -->
+                <div class="col-12 mt-2">
+                    <h4 class="section-title">관심 및 기피 섹터</h4>
+                    <p class="text-muted small mb-3">한 번 누르면 '선호(파랑)', 두 번 누르면 '기피(빨강)', 세 번 누르면 '해제' 됩니다.</p>
+                    
+                    <div class="sector-selector">
+                        {% for s in sectors %}
+                        <div class="sector-chip {% if s in profile.preferred_sectors.all %}preferred{% elif s in profile.avoided_sectors.all %}avoided{% endif %}" 
+                             data-id="{{ s.id }}" 
+                             onclick="toggleSector(this)">
+                            {{ s.name }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <button type="submit" class="save-btn">프로필 정보 저장하기</button>
+            </div>
+        </form>
+
+        <hr class="profile-divider">
+
+        <!-- AI Persona Analysis -->
+        <div class="ai-persona-section" style="margin-top: 0;">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="d-flex align-items-center">
+                    <div class="bg-white text-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px;">
+                        <i class="bi bi-magic fs-5"></i>
+                    </div>
+                    <h4 class="mb-0 fw-bold">나의 투자 페르소나 분석</h4>
+                </div>
+                <button type="button" class="analyze-btn" onclick="fetchAIPersona()">분석하기</button>
+            </div>
+            
+            <div id="aiPersonaContainer" class="ai-persona-card">
+                <div id="aiPersonaLoading" class="text-center py-4 d-none">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-3 mb-0 text-muted">AI가 당신의 투자 성향을 기반으로 페르소나를 분석 중입니다...</p>
+                </div>
+                <div id="aiPersonaContent" class="text-dark">
+                    <p class="mb-0" style="white-space: pre-wrap; line-height: 1.8;">
+                        '분석하기' 버튼을 눌러 당신의 성향, 선호 섹터, 위험 선호도를 기반으로 한 맞춤형 투자 페르소나를 확인해보세요!
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 슬라이더 수치 실시간 표시
+    document.getElementById('risk_range').addEventListener('input', function(e) {
+        document.getElementById('risk_val').textContent = e.target.value;
+    });
+    document.getElementById('trend_range').addEventListener('input', function(e) {
+        document.getElementById('trend_val').textContent = e.target.value;
+    });
+
+    // AI 페르소나 분석 불러오기
+    function fetchAIPersona() {
+        const loadingEl = document.getElementById('aiPersonaLoading');
+        const contentEl = document.getElementById('aiPersonaContent');
+        
+        loadingEl.classList.remove('d-none');
+        contentEl.classList.add('d-none');
+
+        fetch('{% url "profile-ai-analysis" %}')
+            .then(res => res.json())
+            .then(data => {
+                if (data.persona) {
+                    contentEl.innerText = data.persona;
+                    contentEl.classList.remove('d-none');
+                    loadingEl.classList.add('d-none');
+                } else {
+                    throw new Error("분석 데이터를 가져오지 못했습니다.");
+                }
+            })
+            .catch(err => {
+                console.error("AI Persona error:", err);
+                contentEl.innerText = "분석 데이터를 가져오는 중 오류가 발생했습니다. 성향을 설정하고 저장한 뒤 다시 시도해주세요.";
+                contentEl.classList.remove('d-none');
+                loadingEl.classList.add('d-none');
+            });
+    }
+
+    // 섹터 토글 로직
+    function toggleSector(el) {
+        if (el.classList.contains('preferred')) {
+            el.classList.remove('preferred');
+            el.classList.add('avoided');
+        } else if (el.classList.contains('avoided')) {
+            el.classList.remove('avoided');
+        } else {
+            el.classList.add('preferred');
+        }
+    }
+
+    // 폼 제출
+    document.getElementById('profileUpdateForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        formData.append('risk_score', document.getElementById('risk_range').value);
+        formData.append('trend_score', document.getElementById('trend_range').value);
+        
+        const preferred = document.querySelectorAll('.sector-chip.preferred');
+        preferred.forEach(el => formData.append('preferred_sectors', el.dataset.id));
+        
+        const avoided = document.querySelectorAll('.sector-chip.avoided');
+        avoided.forEach(el => formData.append('avoided_sectors', el.dataset.id));
+
+        fetch('{% url "profile-page" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('프로필이 성공적으로 업데이트되었습니다!');
+                window.location.reload();
+            } else {
+                alert('오류 발생: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('업데이트 중 오류가 발생했습니다.');
+        });
+    });
+</script>
+{% endblock %}
+

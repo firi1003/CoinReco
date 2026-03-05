@@ -1,0 +1,9 @@
+Django>=5.1,<6.0
+djangorestframework
+django-cors-headers
+openai
+python-dotenv
+requests
+tqdm
+google-generativeai
+httpx
